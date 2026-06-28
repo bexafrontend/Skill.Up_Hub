@@ -2,9 +2,10 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from '@/components/shared/Providers';
 import { Toaster } from 'react-hot-toast';
+import { GoogleAnalytics } from '@next/third-parties/google';
 
 export const metadata: Metadata = {
-  title: 'SkillUp Hub — Uzbek Freelance Platform',
+  title: 'SkillUp Hub – Uzbek Freelance Platform',
   description: "O'zbekiston uchun eng yaxshi frilanserlik platformasi",
 };
 
@@ -26,6 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           />
         </Providers>
       </body>
+      {/* Google Analytics ID muvaffaqiyatli ulandi */}
+      <GoogleAnalytics gaId="G-487T209L61" />
     </html>
   );
 }
