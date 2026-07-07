@@ -6,7 +6,7 @@ import { useEffect } from 'react';
 import LandingPage from '@/components/shared/LandingPage';
 
 export default function Home() {
-  const { data: session, status } = useSession();
+const { data: session, status, update } = useSession();
   const router = useRouter();
 
   useEffect(() => {
