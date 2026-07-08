@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase-admin';
-import { FieldValue } from 'firebase-admin/firestore';
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -8,30 +7,41 @@ export async function GET(req: NextRequest) {
   const category = searchParams.get('category');
 
   try {
-    let query: FirebaseFirestore.Query = adminDb.collection('jobs');
-
     const now = new Date().toISOString();
+    let jobs: any[];
 
     if (employerId) {
-      // Employer o'z e'lonlarining hammasini ko'radi (to'lov kutilayotganlarni ham)
-      query = adminDb.collection('jobs').where('employerId', '==', employerId);
-      query = query.orderBy('createdAt', 'desc');
+      // Employer o'z e'lonlarining hammasini ko'radi (to'lov kutilayotganlarni ham).
+      // Faqat bitta maydon (employerId) bo'yicha filtr qilamiz — Firestore'ning
+      // avtomatik yaratadigan indeksi yetarli, alohida composite index kerak emas.
+      // Tartiblashni (createdAt bo'yicha) shu yerda, kodda qilamiz.
+      const snapshot = await adminDb
+        .collection('jobs')
+        .where('employerId', '==', employerId)
+        .limit(200)
+        .get();
+      jobs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
+      jobs.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
     } else {
-      // Boshqalar faqat faol va to'lovi tasdiqlangan e'lonlarni ko'radi
-      query = query.where('isActive', '==', true).where('expiresAt', '>', now);
+      // Boshqalar faqat faol e'lonlarni ko'radi. Yana bitta maydon (isActive)
+      // bo'yicha filtr qilamiz, qolganini (muddati o'tganmi, kategoriya, komissiya
+      // to'langanmi) kodda tekshiramiz — composite index talab qilinmaydi.
+      const snapshot = await adminDb
+        .collection('jobs')
+        .where('isActive', '==', true)
+        .limit(200)
+        .get();
+      jobs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
+      jobs = jobs.filter((j) => j.expiresAt > now);
       if (category) {
-        query = query.where('category', '==', category);
+        jobs = jobs.filter((j) => j.category === category);
       }
-      query = query.orderBy('expiresAt', 'desc');
-    }
-
-    const snapshot = await query.limit(50).get();
-    let jobs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })) as any[];
-
-    if (!employerId) {
       // Faqat komissiyasi to'langan (yoki budget bo'lmagan) e'lonlarni ko'rsatish
       jobs = jobs.filter((j) => !j.budget || j.commissionPaid);
+      jobs.sort((a, b) => (b.expiresAt || '').localeCompare(a.expiresAt || ''));
     }
+
+    jobs = jobs.slice(0, 50);
 
     return NextResponse.json({ jobs });
   } catch (error) {
